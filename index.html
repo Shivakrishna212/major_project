@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Narrative Learning Engine</title>
+    
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; margin: 0; padding: 20px; display: flex; justify-content: center; }
+        .container { width: 100%; max-width: 800px; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        h1 { color: #2c3e50; text-align: center; margin-bottom: 30px; }
+        .card { border: 2px dashed #bdc3c7; padding: 40px; text-align: center; border-radius: 8px; margin-bottom: 20px; transition: 0.3s; cursor: pointer; }
+        .card:hover { border-color: #3498db; background: #f7f9fc; }
+        .input-group { margin-top: 20px; display: flex; gap: 10px; }
+        input[type="text"] { flex: 1; padding: 12px; border: 1px solid #bdc3c7; border-radius: 6px; }
+        button { padding: 12px 24px; background: #3498db; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        button:hover { background: #2980b9; }
+        button:disabled { background: #bdc3c7; cursor: not-allowed; }
+        .story-text { line-height: 1.8; color: #34495e; font-size: 1.1em; background: #fafafa; padding: 20px; border-radius: 8px; border-left: 4px solid #3498db; }
+        .quiz-section { margin-top: 40px; }
+        .question { margin-bottom: 20px; background: #fdfdfd; padding: 15px; border: 1px solid #eee; border-radius: 6px; }
+        .option { display: block; padding: 10px; margin: 5px 0; background: white; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; }
+        .option:hover { background: #f0f8ff; }
+        .selected { background: #d4e6f1; border-color: #3498db; }
+        .loading { text-align: center; color: #7f8c8d; font-style: italic; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState } = React;
+
+        function App() {
+            const [view, setView] = useState('home'); // 'home', 'loading', 'story'
+            const [narrative, setNarrative] = useState(null);
+            const [topic, setTopic] = useState("");
+
+            // --- API FUNCTIONS ---
+            const handleTopicSubmit = async () => {
+                if(!topic) return;
+                setView('loading');
+                try {
+                    // Send request to your Python Backend
+                    const res = await axios.post('http://127.0.0.1:5000/api/topic', { topic });
+                    fetchNarrative(res.data.narrative_id);
+                } catch (err) {
+                    alert("Error connecting to server. Is app.py running?");
+                    setView('home');
+                }
+            };
+
+            const handleFileUpload = async (e) => {
+                const file = e.target.files[0];
+                if(!file) return;
+                
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                setView('loading');
+                try {
+                    const res = await axios.post('http://127.0.0.1:5000/api/upload', formData);
+                    fetchNarrative(res.data.narrative_id);
+                } catch (err) {
+                    alert("Upload failed. Is app.py running?");
+                    setView('home');
+                }
+            };
+
+            const fetchNarrative = async (id) => {
+                try {
+                    const res = await axios.get(`http://127.0.0.1:5000/api/narrative/${id}`);
+                    setNarrative(res.data);
+                    setView('story');
+                } catch (err) {
+                    alert("Could not load story.");
+                    setView('home');
+                }
+            };
+
+            // --- UI COMPONENTS ---
+            
+            if (view === 'loading') {
+                return (
+                    <div className="container">
+                        <h1>Generating Lesson...</h1>
+                        <p className="loading">The AI is reading your materials and writing a story...</p>
+                        <div style={{textAlign:'center', marginTop:'20px'}}>
+                            <div style={{fontSize: '40px'}}>🤖 📝</div>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (view === 'story' && narrative) {
+                return (
+                    <div className="container">
+                        <button onClick={() => setView('home')} style={{marginBottom:'20px', background:'#95a5a6'}}>← Start Over</button>
+                        <h1>Interactive Lesson</h1>
+                        
+                        <h3>📖 The Story</h3>
+                        <div className="story-text">
+                            {narrative.story}
+                        </div>
+
+                        <div className="quiz-section">
+                            <h3>🧠 Knowledge Check</h3>
+                            {narrative.quiz && narrative.quiz.map((q, idx) => (
+                                <div key={idx} className="question">
+                                    <strong>Q{idx + 1}: {q.q}</strong>
+                                    <div>
+                                        {q.options.map((opt, oIdx) => (
+                                            <div key={oIdx} className="option" onClick={(e) => {
+                                                if(opt.startsWith(q.ans)) e.target.style.background = '#dff9fb'; // Hint logic
+                                                else alert(`You chose: ${opt}`);
+                                            }}>
+                                                {opt}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                );
+            }
+
+            return ( // HOME VIEW
+                <div className="container">
+                    <h1>🎓 Narrative Learning Engine</h1>
+                    
+                    {/* Path A: PDF Upload */}
+                    <div className="card" onClick={() => document.getElementById('fileInput').click()}>
+                        <h3>📄 Upload PDF Material</h3>
+                        <p>Drag & drop or click to upload lecture notes</p>
+                        <input 
+                            type="file" 
+                            id="fileInput" 
+                            className="hidden" 
+                            accept=".pdf" 
+                            onChange={handleFileUpload} 
+                        />
+                    </div>
+
+                    <p style={{textAlign:'center', color:'#7f8c8d'}}>- OR -</p>
+
+                    {/* Path B: Topic Request */}
+                    <div className="input-group">
+                        <input 
+                            type="text" 
+                            placeholder="Enter a topic (e.g., 'Black Holes', 'Java Streams')" 
+                            value={topic}
+                            onChange={(e) => setTopic(e.target.value)}
+                        />
+                        <button onClick={handleTopicSubmit}>Generate Lesson</button>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
