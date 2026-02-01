@@ -1,0 +1,1908 @@
+/* =========================================
+   1. GLOBAL RESETS & FONTS
+   ========================================= */
+body { 
+  background-color: #f0f4f9; /* Global Light Grey (Gemini Background) */
+  font-family: 'Google Sans', 'Segoe UI', Tahoma, sans-serif; 
+  color: #1f1f1f; 
+  margin: 0;
+  overflow-x: hidden;
+}
+
+/* =========================================
+   2. GEMINI SIDEBAR (Fixed Position)
+   ========================================= */
+.sidebar {
+  width: 280px;
+  height: 100vh;
+  background-color: #f0f4f9; /* Matches body background */
+  display: flex;
+  flex-direction: column;
+  padding: 20px 12px;
+  box-sizing: border-box;
+  position: fixed; /* Sticks to the left */
+  left: 0;
+  top: 0;
+  z-index: 100;
+  /* No border-right in Gemini, it uses space to separate */
+}
+
+/* New Chat "Pill" Button */
+.new-chat-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background-color: #dde3ea;
+  color: #444746;
+  border: none;
+  border-radius: 50px;
+  padding: 12px 24px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-bottom: 30px;
+  width: fit-content;
+}
+
+.new-chat-btn:hover {
+  background-color: #d1d8e0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.new-chat-btn span {
+  font-size: 1.5rem;
+  line-height: 1;
+  font-weight: 300;
+}
+
+/* Section Headers */
+.sidebar-header {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #444746;
+  margin: 10px 12px 8px 12px;
+  text-transform: capitalize;
+}
+
+/* Links & History Items */
+.history-item, .sidebar-link {
+  padding: 10px 16px;
+  margin-bottom: 2px;
+  border-radius: 50px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: #1f1f1f;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background 0.1s ease;
+  display: flex;
+  align-items: center;
+}
+
+.history-item:hover, .sidebar-link:hover {
+  background-color: #e2e7eb;
+}
+
+.history-item.active, .sidebar-link.active {
+  background-color: #c2e7ff; /* Active Blue */
+  color: #001d35;
+  font-weight: 600;
+}
+
+/* Scrollable History List */
+.history-list {
+  flex: 1;
+  overflow-y: auto;
+  margin-bottom: 10px;
+  padding-right: 5px;
+}
+
+.history-list::-webkit-scrollbar { width: 6px; }
+.history-list::-webkit-scrollbar-thumb { background-color: #ccc; border-radius: 10px; }
+.history-list::-webkit-scrollbar-track { background: transparent; }
+
+/* Sidebar Footer */
+.sidebar-footer {
+  margin-top: auto;
+  padding: 12px 16px;
+  border-radius: 50px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9rem;
+  color: #444746;
+}
+.sidebar-footer:hover { background-color: #e2e7eb; }
+
+
+/* =========================================
+   3. MAIN CONTENT (The White Card)
+   ========================================= */
+.app-layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+.main-content {
+  /* This pushes the content away from the fixed sidebar */
+  margin-left: 280px; 
+  width: calc(100% - 280px);
+  
+  /* The "Card" Look */
+  background-color: #ffffff;
+  min-height: 95vh;
+  margin-top: 2.5vh;
+  margin-right: 20px;
+  border-radius: 20px; /* Rounded corners */
+  padding: 40px;
+  box-sizing: border-box;
+  position: relative;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.02); /* Very subtle shadow */
+}
+
+/* Container for text width limit */
+.container { 
+  max-width: 900px; 
+  margin: 0 auto; 
+  /* text-align: center; Removed center align to fix markdown */
+}
+
+/* =========================================
+   4. COMPONENT STYLES (Cards, Buttons, Inputs)
+   ========================================= */
+.hero h1 { color: #1f1f1f; font-size: 2.5rem; margin-bottom: 10px; text-align: center; }
+
+/* Action Cards */
+.main-actions { display: flex; gap: 20px; justify-content: center; margin-top: 40px; flex-wrap: wrap; }
+.action-card { 
+  background: #f8f9fa; /* Light grey inside white card */
+  padding: 30px; 
+  border-radius: 12px; 
+  border: 1px solid #e0e0e0; /* Subtle border */
+  flex: 1; 
+  min-width: 300px; 
+  text-align: left;
+}
+.action-card:hover { background: #f0f4f9; }
+
+/* Modules Grid (Roadmap) */
+.modules-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.module-card {
+    background: #ffffff;
+    border: 1px solid #e0e0e0;
+    padding: 20px;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.module-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    border-color: #0b57d0;
+}
+
+.module-card.active-card {
+    border: 2px solid #0b57d0;
+    background-color: #f0f8ff;
+}
+
+/* Inputs */
+input[type="text"] { 
+  width: 90%; 
+  padding: 12px; 
+  margin: 15px 0; 
+  border: 1px solid #c4c7c5; 
+  border-radius: 8px; 
+  font-size: 1rem;
+}
+input[type="text"]:focus { outline: 2px solid #0b57d0; border-color: transparent; }
+
+/* Buttons */
+.primary-btn { 
+  background: #0b57d0; /* Google Blue */
+  color: white; 
+  padding: 12px 24px; 
+  border: none; 
+  border-radius: 50px; 
+  cursor: pointer; 
+  font-size: 1rem; 
+  width: 100%; 
+  transition: 0.2s; 
+  font-weight: 500;
+}
+.primary-btn:hover { background: #0842a0; box-shadow: 0 1px 2px rgba(0,0,0,0.3); }
+
+.secondary-btn { 
+  background: #e3e3e3; 
+  color: #1f1f1f; 
+  padding: 10px 20px; 
+  border: none; 
+  border-radius: 50px; 
+  cursor: pointer; 
+  width: 100%; 
+  font-size: 0.9rem;
+}
+.secondary-btn:hover { background: #d3d3d3; }
+
+/* Sections for Scroll */
+section { scroll-margin-top: 80px; }
+
+/* =========================================
+   5. MARKDOWN STYLING (The AI Text)
+   ========================================= */
+
+.markdown-container {
+  font-family: 'Google Sans', 'Segoe UI', sans-serif;
+  line-height: 1.7;
+  color: #333;
+  text-align: left; /* Ensure text is left-aligned */
+}
+
+/* Headers */
+.markdown-container h1, 
+.markdown-container h2, 
+.markdown-container h3 {
+  color: #1f1f1f;
+  margin-top: 25px;
+  margin-bottom: 15px;
+  font-weight: 600;
+}
+
+.markdown-container h1 { font-size: 2rem; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+.markdown-container h2 { font-size: 1.5rem; }
+
+/* Paragraphs */
+.markdown-container p {
+  margin-bottom: 15px;
+  font-size: 1rem;
+}
+
+/* Lists */
+.markdown-container ul, .markdown-container ol {
+  margin-bottom: 20px;
+  padding-left: 25px;
+}
+.markdown-container li {
+  margin-bottom: 8px;
+}
+
+/* Bold Text */
+.markdown-container strong {
+  color: #0b57d0; /* Gemini Blue for emphasis */
+}
+
+/* Code Blocks (The Black Boxes) */
+.markdown-container pre {
+  background-color: #f4f7f6;
+  padding: 15px;
+  border-radius: 8px;
+  overflow-x: auto; /* Scroll if code is too long */
+  border: 1px solid #e0e0e0;
+  margin: 20px 0;
+}
+
+/* Inline Code (e.g. `int main`) */
+.markdown-container code {
+  background-color: #e8eaed;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9em;
+  color: #d63384; /* Distinct color for code snippets */
+}
+
+/* Fix for code inside blocks not doubling up styles */
+.markdown-container pre code {
+  background-color: transparent;
+  padding: 0;
+  color: #333;
+}
+
+/* =========================================
+   6. ANIMATIONS
+   ========================================= */
+.fade-in {
+  animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Lesson Viewer Specifics */
+.lesson-card-large {
+    margin-top: 30px;
+    padding: 30px;
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+}
+
+.lesson-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 15px;
+    margin-bottom: 20px;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    color: #666;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+.close-btn:hover { text-decoration: underline; color: #d93025; }
+
+/* Responsive Mobile Fix */
+@media (max-width: 768px) {
+  .sidebar {
+    display: none; 
+  }
+  .main-content {
+    margin-left: 0;
+    width: 100%;
+    margin-right: 0;
+    border-radius: 0;
+    padding: 20px;
+  }
+}
+/* =========================================
+   7. QUIZ SECTION STYLES
+   ========================================= */
+
+.quiz-section {
+  margin-top: 40px;
+  padding-bottom: 60px;
+}
+
+.quiz-placeholder {
+  text-align: center;
+  padding: 40px;
+  background: #f8f9fa;
+  border-radius: 12px;
+  color: #666;
+  border: 1px dashed #ccc;
+}
+
+/* The Active Quiz Card */
+.quiz-card-active {
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 30px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+  max-width: 800px;
+  margin: 0 auto; /* Center it */
+}
+
+.quiz-header {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 20px;
+}
+
+.quiz-question {
+  font-size: 1.3rem;
+  color: #1f1f1f;
+  margin-bottom: 30px;
+  font-weight: 500;
+}
+
+/* The Option Buttons Grid */
+.quiz-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr; /* Two columns */
+  gap: 15px;
+  margin-bottom: 30px;
+}
+
+.option-btn {
+  padding: 15px 20px;
+  background-color: #f0f4f9;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1rem;
+  color: #333;
+  text-align: left;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.option-btn:hover {
+  background-color: #e2e7eb;
+}
+
+/* Selected State (Blue Border) */
+.option-btn.selected {
+  background-color: #e8f0fe;
+  border-color: #0b57d0;
+  color: #0b57d0;
+  font-weight: 500;
+}
+
+.quiz-footer {
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid #eee;
+  padding-top: 20px;
+}
+
+/* Quiz Results Card */
+.quiz-result {
+  text-align: center;
+  background: #ffffff;
+  padding: 40px;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+  border: 1px solid #e0e0e0;
+}
+
+.score-display {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #0b57d0;
+  margin: 10px 0;
+}
+
+.praise {
+  color: #444;
+  margin-bottom: 30px;
+}
+/* =========================================
+   8. DASHBOARD (HOME) STYLES
+   ========================================= */
+
+/* Center the content vertically like Gemini Home */
+.main-content-centered {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 80vh; /* Takes up most of the screen */
+    text-align: center;
+}
+
+.hero h1.gradient-text {
+    font-size: 3.5rem;
+    margin-bottom: 10px;
+    background: linear-gradient(90deg, #4285f4, #d96570);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: -1px;
+}
+
+/* Large Input Box */
+.input-area-large {
+    width: 100%;
+    max-width: 700px;
+    position: relative;
+    margin-top: 40px;
+}
+
+.input-area-large input {
+    width: 100%;
+    padding: 20px 60px 20px 25px; /* Space for button */
+    font-size: 1.1rem;
+    border-radius: 50px;
+    border: 1px solid #dfe1e5;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    outline: none;
+    transition: all 0.2s ease;
+    box-sizing: border-box; /* IMPORTANT fix */
+}
+
+.input-area-large input:focus {
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    border-color: #c0c0c0;
+}
+
+.send-btn {
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: #4285f4;
+    cursor: pointer;
+    padding: 10px;
+}
+.send-btn:disabled { color: #ccc; }
+
+/* Suggestion Chips */
+.suggestions-container {
+    display: flex;
+    gap: 15px;
+    margin-top: 40px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.suggestion-chip {
+    background: #f0f4f9;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 12px;
+    font-size: 0.95rem;
+    color: #444746;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.suggestion-chip:hover {
+    background: #e2e7eb;
+}
+/* Completed Module Styling */
+.module-card.completed-card {
+    border: 1px solid #4caf50; /* Green border */
+    background-color: #f6fff6; /* Very light green bg */
+}
+
+.btn-completed {
+    background-color: #e8f5e9;
+    color: #2e7d32;
+    font-weight: 500;
+}
+/* Sidebar Delete Button */
+.history-item {
+    /* Existing styles... ensure position is relative if needed */
+    position: relative; 
+}
+
+.delete-btn {
+    background: none;
+    border: none;
+    color: #888;
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 0 5px;
+    opacity: 0; /* Hidden by default */
+    transition: opacity 0.2s, color 0.2s;
+    line-height: 1;
+}
+
+.history-item:hover .delete-btn {
+    opacity: 1; /* Show on hover */
+}
+
+.delete-btn:hover {
+    color: #ff5555; /* Red on hover */
+}
+/* --- NEW ROADMAP UI (Skill Tree Style) --- */
+
+.roadmap-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  padding: 40px 20px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+/* The vertical connecting line */
+.roadmap-line {
+  position: absolute;
+  top: 60px;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  background-image: linear-gradient(to bottom, #ccc 50%, rgba(255,255,255,0) 0%);
+  background-position: left;
+  background-size: 2px 20px; /* Dashed effect */
+  background-repeat: repeat-y;
+  transform: translateX(-50%);
+  z-index: 0;
+}
+
+/* Individual Module Node */
+.roadmap-node {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: white;
+  border-radius: 12px;
+  padding: 15px 20px;
+  margin-bottom: 50px; /* Space for the line */
+  width: 100%;
+  max-width: 500px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+  border: 1px solid #eee;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  z-index: 1; /* Sit above the line */
+}
+
+.roadmap-node:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+}
+
+/* STATUS STYLES */
+
+/* Active (Current) */
+.roadmap-node.active-node {
+  border: 2px solid #6c63ff;
+  box-shadow: 0 0 0 4px rgba(108, 99, 255, 0.1);
+}
+
+/* Completed */
+.roadmap-node.completed-node {
+  border: 2px solid #4caf50;
+}
+
+/* Locked */
+.roadmap-node.locked-node {
+  background: #f9f9f9;
+  opacity: 0.7;
+  cursor: not-allowed;
+  filter: grayscale(1);
+}
+
+/* --- THE BADGE (Left Icon "Ba", "Co") --- */
+.node-badge {
+  width: 50px;
+  height: 50px;
+  background: #f0f4f8;
+  color: #333;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 1.2rem;
+  margin-right: 20px;
+  border: 1px solid #e1e4e8;
+  flex-shrink: 0;
+}
+
+.active-node .node-badge {
+  background: #6c63ff;
+  color: white;
+  border-color: #6c63ff;
+}
+
+.completed-node .node-badge {
+  background: #4caf50;
+  color: white;
+  border-color: #4caf50;
+}
+
+/* CONTENT TEXT */
+.node-content {
+  flex: 1;
+}
+
+.node-title {
+  font-weight: 700;
+  font-size: 1.1rem;
+  margin: 0;
+  color: #2c3e50;
+}
+
+.node-desc {
+  font-size: 0.85rem;
+  color: #666;
+  margin: 5px 0 0 0;
+  line-height: 1.4;
+}
+
+/* STATUS ICON (Lock / Check) */
+.node-status-icon {
+  margin-left: 15px;
+  font-size: 1.2rem;
+  color: #ccc;
+}
+
+.completed-node .node-status-icon {
+  color: #4caf50;
+}
+
+.active-node .node-status-icon {
+  color: #6c63ff;
+}
+/* --- MODAL / POPUP STYLES --- */
+
+/* The dark background overlay */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.75); /* Dim background */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000; /* Sit on top of everything */
+  backdrop-filter: blur(5px); /* Nice blur effect */
+  animation: fadeIn 0.3s ease;
+}
+
+/* The actual white box */
+.modal-content-box {
+  background: white;
+  width: 90%;
+  max-width: 900px;
+  height: 90vh; /* 90% of screen height */
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  position: relative;
+  animation: slideUp 0.3s ease;
+}
+
+/* Fixed Header inside the modal */
+.modal-header {
+  padding: 20px 30px;
+  border-bottom: 1px solid #eee;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #fff;
+  z-index: 10;
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 1.4rem;
+  color: #333;
+}
+
+/* Scrollable Body */
+.modal-body {
+  padding: 40px;
+  overflow-y: auto; /* Scroll inside the box, not the page */
+  flex: 1;
+  background-color: #f9f9f9;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(50px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* Close Button styling */
+.close-btn {
+  background: #f1f3f4;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-weight: 600;
+  color: #555;
+  transition: all 0.2s;
+}
+
+.close-btn:hover {
+  background: #e0e0e0;
+  color: #000;
+}
+/* --- XP ANIMATIONS --- */
+
+/* The Container for the bar needs relative positioning */
+.xp-container {
+  position: relative;
+  margin-top: 5px;
+}
+
+/* The Progress Bar with Smooth Transition */
+.xp-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4caf50, #81c784); /* Gradient looks nicer */
+  transition: width 1.5s cubic-bezier(0.4, 0, 0.2, 1); /* Smooth fill ease */
+  box-shadow: 0 0 10px rgba(76, 175, 80, 0.5); /* Glowing effect */
+}
+
+/* The Floating +XP Text */
+.xp-floater {
+  position: absolute;
+  top: -20px;
+  right: 0;
+  color: #4caf50; /* Green text */
+  font-weight: 900;
+  font-size: 1.2rem;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+  pointer-events: none; /* Let clicks pass through */
+  animation: floatUp 2s ease-out forwards;
+  z-index: 100;
+}
+
+/* The Animation Keyframes */
+@keyframes floatUp {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.8);
+  }
+  20% {
+    opacity: 1;
+    transform: translateY(0) scale(1.2); /* Pop effect */
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-40px) scale(1);
+  }
+}
+
+/* Level Badge Pop Effect */
+.level-badge.pop {
+  animation: badgePop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes badgePop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.5); box-shadow: 0 0 20px #4285f4; }
+  100% { transform: scale(1); }
+}
+/* =========================================
+   9. HYBRID IMAGE CARD STYLES
+   ========================================= */
+
+/* Container for the Image + Search Button */
+.lesson-image-container {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 15px;
+  display: inline-block; /* Wraps tightly around content */
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 30px;
+  border: 1px solid #e0e0e0; /* Subtle border */
+  box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.lesson-image-container:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 15px rgba(0,0,0,0.05);
+}
+
+/* The Image Itself */
+.lesson-image-container img {
+  border-radius: 8px;
+  display: block;
+  margin: 0 auto;
+}
+
+/* The "View on Google" Button inside the container */
+.lesson-image-container .secondary-btn {
+  margin-top: 12px;
+  background-color: #f8f9fa;
+  border-color: #dadce0;
+  color: #1a73e8; /* Google Blue Text */
+  font-size: 0.85rem;
+  padding: 8px 16px;
+}
+
+.lesson-image-container .secondary-btn:hover {
+  background-color: #e8f0fe;
+  border-color: #d2e3fc;
+  color: #174ea6;
+}
+/* --- REAL IMAGE STYLES --- */
+.lesson-image-container {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 10px;
+  border: 1px solid #e0e0e0;
+  margin-bottom: 30px;
+  text-align: center;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+}
+
+.lesson-image-container img {
+  display: block;
+  margin: 0 auto;
+}
+/* --- GLOBAL RESET & FONTS --- */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  --sidebar-bg: #1e1e1e;       /* Dark sidebar */
+  --sidebar-text: #e0e0e0;     /* Light text */
+  --sidebar-hover: #2d2d2d;    /* Hover state */
+  --primary-color: #4285f4;    /* Google Blue */
+  --bg-color: #ffffff;         /* Main background */
+  --text-primary: #333333;
+  --card-shadow: 0 8px 24px rgba(0,0,0,0.08);
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* --- LAYOUT GRID --- */
+.app-layout {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.main-content {
+  flex: 1;
+  overflow-y: auto; /* Allow scrolling */
+  position: relative;
+  background: #fff;
+}
+
+.main-content-centered {
+  display: flex;
+  flex-direction: column;
+  justify-content: center; /* Center vertically */
+  align-items: center;     /* Center horizontally */
+  height: 100vh;
+  max-width: 800px;
+  margin: 0 auto;
+  text-align: center;
+  padding: 0 20px;
+}
+
+/* --- SIDEBAR STYLING (The Fix) --- */
+.sidebar {
+  width: 260px;
+  background-color: var(--sidebar-bg);
+  color: var(--sidebar-text);
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  padding: 20px;
+  box-sizing: border-box;
+  border-right: 1px solid #333;
+}
+
+.sidebar-header h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #fff;
+  margin: 0 0 20px 0;
+  letter-spacing: -0.5px;
+}
+
+/* History List Area */
+.sidebar-nav {
+  flex: 1;
+  overflow-y: auto;
+  margin-top: 10px;
+}
+
+/* Navigation Items */
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  margin-bottom: 4px;
+  color: #aaa;
+  text-decoration: none;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
+}
+
+.nav-item:hover {
+  background-color: var(--sidebar-hover);
+  color: #fff;
+}
+
+.nav-item.active {
+  background-color: rgba(66, 133, 244, 0.2);
+  color: #4285f4;
+}
+
+/* Sidebar Footer (Settings/Logout) */
+.sidebar-footer {
+  margin-top: auto;
+  border-top: 1px solid #333;
+  padding-top: 15px;
+}
+
+/* --- DASHBOARD HERO & SEARCH --- */
+.gradient-text {
+  background: linear-gradient(135deg, #4285f4 0%, #9b51e0 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-size: 3.5rem;
+  font-weight: 800;
+  margin-bottom: 10px;
+  letter-spacing: -1px;
+}
+
+.input-area-large {
+  width: 100%;
+  max-width: 650px;
+  position: relative;
+  margin: 40px 0;
+}
+
+.input-area-large input {
+  width: 100%;
+  padding: 20px 60px 20px 25px;
+  font-size: 1.1rem;
+  border: 1px solid #dfe1e5;
+  border-radius: 30px;
+  outline: none;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08); /* Soft shadow */
+  transition: all 0.3s ease;
+}
+
+.input-area-large input:focus {
+  box-shadow: 0 8px 20px rgba(66, 133, 244, 0.2);
+  border-color: rgba(66, 133, 244, 0.3);
+}
+
+.send-btn {
+  position: absolute;
+  right: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #f1f3f4;
+  border: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  color: #555;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.send-btn:hover {
+  background: #e8eaed;
+  color: #000;
+}
+
+.send-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* --- SUGGESTION CHIPS --- */
+.suggestions-container {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 700px;
+}
+
+.suggestion-chip {
+  background: #fff;
+  border: 1px solid #eee;
+  padding: 10px 18px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  color: #555;
+  transition: all 0.2s;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.03);
+  font-weight: 500;
+}
+
+.suggestion-chip:hover {
+  border-color: #d0d0d0;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.06);
+}
+
+/* --- BUTTONS --- */
+.primary-btn {
+  background-color: #fff; /* White button */
+  color: #333;
+  border: 1px solid #444;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.95rem;
+}
+
+.primary-btn:hover {
+  background-color: #333;
+  color: #fff;
+  border-color: #333;
+}
+/* --- BYJU'S STYLE ROADMAP --- */
+
+/* The Container for the path */
+.roadmap-path-container {
+  position: relative;
+  padding: 40px 0;
+  max-width: 600px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* The Vertical Connecting Line */
+.roadmap-path-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 4px;
+  background: #e0e0e0;
+  transform: translateX(-50%);
+  z-index: 0;
+}
+
+/* The Individual Module Container */
+.roadmap-node-wrapper {
+  position: relative;
+  z-index: 1; /* Sit above the line */
+  margin: 30px 0; /* Spacing between circles */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* The Circular Node (Icon) */
+.node-circle {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: white;
+  border: 4px solid #4285f4; /* Default Blue */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #555;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* Bouncy effect */
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  position: relative;
+}
+
+/* Hover Effect: Scale up */
+.node-circle:hover {
+  transform: scale(1.15);
+  box-shadow: 0 8px 20px rgba(66, 133, 244, 0.3);
+}
+
+/* Completed Node Style */
+.node-circle.completed {
+  background: #34a853; /* Green */
+  border-color: #34a853;
+  color: white;
+}
+
+/* Locked Node Style */
+.node-circle.locked {
+  background: #f1f3f4;
+  border-color: #ddd;
+  color: #aaa;
+  cursor: not-allowed;
+}
+.node-circle.locked:hover {
+  transform: none; /* Don't bounce if locked */
+}
+
+/* --- THE HOVER POPUP (Tooltip) --- */
+.node-details-popup {
+  position: absolute;
+  left: 100px; /* Push to the right of the circle */
+  top: 50%;
+  transform: translateY(-50%) translateX(-20px);
+  background: white;
+  padding: 15px 20px;
+  width: 280px;
+  border-radius: 12px;
+  box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease;
+  pointer-events: none; /* Don't interfere with mouse unless visible */
+  border-left: 5px solid #4285f4;
+}
+
+/* Arrow pointing to circle */
+.node-details-popup::before {
+  content: "";
+  position: absolute;
+  left: -10px;
+  top: 50%;
+  transform: translateY(-50%);
+  border-width: 10px;
+  border-style: solid;
+  border-color: transparent white transparent transparent;
+}
+
+/* Show Popup on Hover */
+.node-circle:hover + .node-details-popup,
+.node-details-popup:hover {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(-50%) translateX(10px); /* Slide in */
+  pointer-events: auto;
+}
+
+/* Adjust popup color for completed nodes */
+.node-circle.completed + .node-details-popup {
+  border-left-color: #34a853;
+}
+/* --- WIGGLY ROADMAP STYLE --- */
+
+.roadmap-path-container {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  /* Min height ensures SVG isn't cut off */
+  min-height: 500px; 
+}
+
+/* Individual Module Wrapper */
+.roadmap-node-wrapper {
+  position: relative;
+  height: 160px; /* Matches vGap in JS */
+  display: flex;
+  align-items: center;
+  justify-content: center; /* Default Center */
+  transition: all 0.3s ease;
+}
+
+/* Position Offsets */
+.roadmap-node-wrapper.center {
+  justify-content: center;
+}
+
+.roadmap-node-wrapper.right {
+  justify-content: flex-end;
+  padding-right: 110px; /* 300px center + 150px gap - width adjustment */
+}
+
+.roadmap-node-wrapper.left {
+  justify-content: flex-start;
+  padding-left: 110px;
+}
+
+/* The Circular Node */
+.node-circle {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: white;
+  border: 4px solid #4285f4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #555;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  z-index: 5; /* Above SVG */
+}
+
+.node-circle:hover {
+  transform: scale(1.2);
+  box-shadow: 0 8px 25px rgba(66, 133, 244, 0.4);
+}
+
+.node-circle.completed {
+  background: #34a853;
+  border-color: #34a853;
+  color: white;
+}
+
+.node-circle.locked {
+  background: #f8f9fa;
+  border-color: #e0e0e0;
+  color: #ccc;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+.node-circle.locked:hover { transform: none; }
+
+/* --- POPUP TOOLTIPS --- */
+.node-details-popup {
+  position: absolute;
+  background: white;
+  padding: 15px 20px;
+  width: 260px;
+  border-radius: 12px;
+  box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease;
+  pointer-events: none;
+  z-index: 10;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/* Popup appearing on the RIGHT (for Left/Center nodes) */
+.popup-right {
+  left: 60%; /* Anchored relative to the wrapper */
+  margin-left: 50px;
+  border-left: 5px solid #4285f4;
+}
+
+/* Popup appearing on the LEFT (for Right nodes) */
+.popup-left {
+  right: 60%;
+  margin-right: 50px;
+  border-right: 5px solid #4285f4;
+  text-align: right; /* Align text nicely for left popups */
+}
+
+/* Show on Hover */
+.node-circle:hover + .node-details-popup,
+.node-details-popup:hover {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+/* Completed Color override for popup */
+.node-circle.completed + .popup-right { border-left-color: #34a853; }
+.node-circle.completed + .popup-left { border-right-color: #34a853; }
+
+/* --- AI TUTOR CHAT --- */
+.chat-container {
+  margin-top: 40px;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  background: #f8f9fa;
+  display: flex;
+  flex-direction: column;
+  height: 500px; /* Fixed height for scroll */
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.chat-header {
+  padding: 15px 20px;
+  background: white;
+  border-bottom: 1px solid #eee;
+}
+
+.chat-header h3 { margin: 0; color: #333; }
+
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.chat-bubble-wrapper {
+  display: flex;
+  align-items: flex-end; /* Align trash icon at bottom */
+  gap: 8px;
+  max-width: 80%;
+}
+
+.chat-bubble-wrapper.user {
+  align-self: flex-end;
+  flex-direction: row-reverse; /* Trash icon on left of bubble for user */
+}
+
+.chat-bubble-wrapper.ai {
+  align-self: flex-start;
+}
+
+.chat-bubble {
+  padding: 12px 16px;
+  border-radius: 18px;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  position: relative;
+  word-wrap: break-word;
+}
+
+.chat-bubble.user {
+  background: #4285f4;
+  color: white;
+  border-bottom-right-radius: 4px;
+}
+
+.chat-bubble.ai {
+  background: white;
+  color: #333;
+  border: 1px solid #e0e0e0;
+  border-bottom-left-radius: 4px;
+}
+
+/* Delete Button (Hidden by default, shows on hover) */
+.delete-chat-btn {
+  opacity: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: #aaa;
+  transition: all 0.2s;
+}
+
+.chat-bubble-wrapper:hover .delete-chat-btn {
+  opacity: 1;
+}
+
+.delete-chat-btn:hover {
+  color: #d93025;
+}
+
+/* Input Area */
+.chat-input-area {
+  padding: 15px;
+  background: white;
+  border-top: 1px solid #eee;
+  display: flex;
+  gap: 10px;
+}
+
+.chat-input-area input {
+  flex: 1;
+  padding: 12px;
+  border-radius: 20px;
+  border: 1px solid #ddd;
+  outline: none;
+}
+
+.chat-input-area input:focus {
+  border-color: #4285f4;
+}
+
+.send-chat-btn {
+  background: #4285f4;
+  color: white;
+  border: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+}
+.send-chat-btn:disabled { background: #ccc; }
+/* --- MARKDOWN RICH DATA STYLING --- */
+
+/* 1. TABLES */
+.markdown-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 20px 0;
+  font-size: 0.95rem;
+  background: white;
+  border-radius: 8px;
+  overflow: hidden; /* For rounded corners */
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.markdown-content th {
+  background-color: #f1f3f4; /* Light gray header */
+  color: #333;
+  font-weight: 600;
+  text-align: left;
+  padding: 12px 15px;
+  border-bottom: 2px solid #ddd;
+}
+
+.markdown-content td {
+  padding: 12px 15px;
+  border-bottom: 1px solid #eee;
+  color: #444;
+}
+
+.markdown-content tr:last-child td {
+  border-bottom: none;
+}
+
+.markdown-content tr:hover {
+  background-color: #fafafa;
+}
+
+/* 2. CODE BLOCKS */
+.markdown-content pre {
+  background: #2d2d2d;
+  color: #f8f8f2;
+  padding: 15px;
+  border-radius: 8px;
+  overflow-x: auto;
+  font-family: 'Consolas', 'Monaco', monospace;
+  margin: 15px 0;
+}
+
+.markdown-content code {
+  font-family: 'Consolas', 'Monaco', monospace;
+  background: rgba(0,0,0,0.05);
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-size: 0.9em;
+  color: #d93025; /* Reddish for inline code */
+}
+
+.markdown-content pre code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  font-size: 1rem;
+}
+
+/* 3. LISTS */
+.markdown-content ul, .markdown-content ol {
+  padding-left: 25px;
+  margin-bottom: 15px;
+}
+
+.markdown-content li {
+  margin-bottom: 5px;
+  line-height: 1.6;
+}
+
+/* 4. BLOCKQUOTES */
+.markdown-content blockquote {
+  border-left: 4px solid #4285f4;
+  margin: 15px 0;
+  padding: 10px 20px;
+  background: #f8f9fa;
+  color: #555;
+  font-style: italic;
+  border-radius: 0 8px 8px 0;
+}
+/* Paste at the bottom of App.css */
+.markdown-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 15px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 0 10px rgba(0,0,0,0.05);
+}
+.markdown-content th {
+  background: #f4f4f4;
+  padding: 12px;
+  text-align: left;
+  font-weight: 600;
+  border-bottom: 2px solid #ddd;
+}
+.markdown-content td {
+  padding: 12px;
+  border-bottom: 1px solid #eee;
+}
+/* --- SIDEBAR DELETE BUTTON --- */
+.history-item {
+  position: relative;
+}
+
+.sidebar-delete-btn {
+  background: none;
+  border: none;
+  color: #666;
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 4px 8px;
+  border-radius: 4px;
+  opacity: 0; /* Hidden by default */
+  transition: all 0.2s ease;
+}
+
+.sidebar-delete-btn:hover {
+  background-color: rgba(217, 48, 37, 0.2);
+  color: #d93025;
+}
+
+/* Show button when hovering over the history item */
+.history-item:hover .sidebar-delete-btn {
+  opacity: 1;
+}
+/* --- IDE LAYOUT STYLES --- */
+
+/* The Main Split Screen Container */
+.ide-container {
+    display: flex;
+    height: calc(100vh - 60px); /* Full height minus header */
+    overflow: hidden;
+    margin-top: 20px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    background: white;
+}
+
+/* Left Panel: Lesson */
+.lesson-panel {
+    flex: 7; /* Takes 70% width */
+    overflow-y: auto;
+    padding: 20px 40px;
+    border-right: 1px solid #eee;
+}
+
+/* Right Panel: Sidebar */
+.sidebar-panel {
+    flex: 3; /* Takes 30% width */
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+}
+
+/* Toggle Buttons (Edit/Preview) */
+.toggle-group {
+    display: flex;
+    background: #e0e0e0;
+    padding: 2px;
+    border-radius: 6px;
+}
+
+.toggle-btn {
+    border: none;
+    background: transparent;
+    padding: 4px 12px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    border-radius: 4px;
+    color: #555;
+    transition: all 0.2s;
+}
+
+.toggle-btn.active {
+    background: white;
+    color: #000;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    font-weight: 500;
+}
+
+/* Fix chat container to fit in sidebar */
+.chat-container {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    border: none; /* Remove old border */
+    box-shadow: none; /* Remove old shadow */
+}
+
+.chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px;
+}
+/* --- IDE LAYOUT STYLES (UPDATED) --- */
+
+/* 1. Make the container fill the screen but keep a small gap */
+.ide-container {
+    display: flex;
+    height: 100%; /* Fill the parent height */
+    width: 100%;
+    overflow: hidden;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    background: white;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+/* 2. Left Panel: Lesson (Adjusted Width) */
+.lesson-panel {
+    flex: 1.5; /* Takes about 60% of the width */
+    overflow-y: auto;
+    padding: 30px 50px; /* More breathing room for text */
+    border-right: 1px solid #eee;
+    background-color: #ffffff;
+}
+
+/* Optional: Limit text width inside the wide panel for readability */
+.lesson-content {
+    max-width: 900px; /* Keeps text readable even on huge screens */
+    margin: 0 auto;   /* Centers the text block */
+}
+
+/* 3. Right Panel: Sidebar (Wider now) */
+.sidebar-panel {
+    flex: 1; /* Takes about 40% of the width */
+    min-width: 400px; /* Ensure it never gets too small */
+    display: flex;
+    flex-direction: column;
+    background: #fcfcfc;
+}
+
+/* 4. Fix Global Container issues */
+/* If your main App container restricts width, override it for the roadmap page */
+.roadmap-page {
+    max-width: 100% !important;
+    width: 100% !important;
+    padding: 0 !important;
+}
+
+/* Ensure the roadmap header doesn't add too much empty space on top */
+.roadmap-header {
+    padding: 10px 20px;
+    margin-bottom: 0;
+}
+/* --- WIGGLY MAP STYLES --- */
+.roadmap-node-wrapper {
+  transition: all 0.3s ease;
+}
+
+.node-circle {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: white;
+  border: 4px solid #e0e0e0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  color: #888;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  position: relative;
+  z-index: 2;
+}
+
+.node-circle:hover {
+  transform: scale(1.15);
+  border-color: #6c5ce7;
+  color: #6c5ce7;
+}
+
+.node-circle.completed {
+  background: #6c5ce7;
+  border-color: #6c5ce7;
+  color: white;
+  box-shadow: 0 0 15px rgba(108, 92, 231, 0.4);
+}
+
+.node-circle.locked {
+  background: #f5f5f5;
+  border-color: #ddd;
+  color: #ccc;
+  cursor: not-allowed;
+}
+
+.node-details-popup {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: white;
+  padding: 10px 15px;
+  border-radius: 8px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease;
+  pointer-events: none;
+  z-index: 10;
+  border: 1px solid #eee;
+  text-align: left;
+}
+
+.popup-left { right: 70px; }
+.popup-right { left: 70px; }
+
+.roadmap-node-wrapper:hover .node-details-popup {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(-50%) translateX(0);
+}
+
+
+
+/* 1. General Text */
+.markdown-content {
+  color: #333 !important; /* Force dark text for readability */
+  font-size: 1rem;
+  line-height: 1.7;
+}
+
+.markdown-content h1, .markdown-content h2, .markdown-content h3 {
+  color: #1a1a1a;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+}
+
+/* 2. Code Blocks (Dark Theme) */
+.markdown-content pre {
+  background: #1e1e1e !important; /* Dark Grey Background */
+  color: #dcdcdc !important;       /* Light Grey Text */
+  padding: 20px;
+  border-radius: 8px;
+  overflow-x: auto; /* Scroll if code is too long */
+  margin: 20px 0;
+  border: 1px solid #333;
+}
+
+.markdown-content code {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+}
+
+/* 3. Inline Code (e.g. `System.out.println`) */
+.markdown-content p code, 
+.markdown-content li code {
+  background: #f4f4f4;
+  color: #d63384; /* Pink/Red for visibility */
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid #ddd;
+  font-size: 0.9em;
+}
+
+/* Override for code inside pre blocks */
+.markdown-content pre code {
+  background: transparent;
+  color: inherit;
+  border: none;
+  padding: 0;
+}
+
+/* 4. Tables */
+.markdown-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 20px 0;
+  font-size: 0.95rem;
+}
+
+.markdown-content th, 
+.markdown-content td {
+  border: 1px solid #ddd; /* Visible borders */
+  padding: 12px;
+  text-align: left;
+}
+
+.markdown-content th {
+  background-color: #f8f9fa; /* Light grey header */
+  font-weight: bold;
+  color: #444;
+}
+
+.markdown-content tr:nth-child(even) {
+  background-color: #fcfcfc; /* Zebra striping */
+}
+
+/* 5. Lists */
+.markdown-content ul, .markdown-content ol {
+  padding-left: 25px;
+  margin-bottom: 15px;
+}
+
+.markdown-content li {
+  margin-bottom: 5px;
+}
