@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import sqlite3
 import hashlib
@@ -7,9 +7,9 @@ import os
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, date
+
+# ✅ LOCAL MODULE IMPORTS
 from ml_service import train_model, predict_risk
-from flask import send_from_directory
-# ✅ IMPORTS
 from ai_service import (
     generate_topic_intro, 
     generate_roadmap, 
@@ -26,6 +26,9 @@ CORS(app)
 DB_NAME = "learning_app.db"
 executor = ThreadPoolExecutor(max_workers=6) 
 
+# =========================================================
+# 🛠️ DATABASE INITIALIZATION
+# =========================================================
 def init_db():
     with sqlite3.connect(DB_NAME) as conn:
         cursor = conn.cursor()
@@ -44,7 +47,7 @@ def init_db():
             )
         ''')
         
-        # 2. Progress
+        # 2. Progress (Topics Started)
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS progress (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -57,7 +60,7 @@ def init_db():
             )
         ''')
 
-        # 3. Chat Messages
+        # 3. Chat Messages (AI Tutor)
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS chat_messages (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -70,7 +73,7 @@ def init_db():
             )
         ''')
 
-        # 4. Module Lessons (Caching)
+        # 4. Module Lessons (Content Caching)
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS module_lessons (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -111,105 +114,45 @@ def init_db():
         conn.commit()
 
 def run_migrations():
+    """Ensure DB schema is up to date without losing data."""
     try:
         with sqlite3.connect(DB_NAME) as conn:
             cursor = conn.cursor()
             
+            # Check for 'completed' in module_lessons
             cursor.execute("PRAGMA table_info(module_lessons)")
             columns = [info[1] for info in cursor.fetchall()]
             if 'completed' not in columns:
-                print("🔧 Migrating DB: Adding 'completed' column...")
                 cursor.execute("ALTER TABLE module_lessons ADD COLUMN completed BOOLEAN DEFAULT 0")
 
+            # Check for 'streak' and 'last_active_date' in users
             cursor.execute("PRAGMA table_info(users)")
             user_columns = [info[1] for info in cursor.fetchall()]
             
             if 'streak' not in user_columns:
-                print("🔧 Migrating DB: Adding 'streak' column...")
                 cursor.execute("ALTER TABLE users ADD COLUMN streak INTEGER DEFAULT 0")
             
             if 'last_active_date' not in user_columns:
-                print("🔧 Migrating DB: Adding 'last_active_date' column...")
                 cursor.execute("ALTER TABLE users ADD COLUMN last_active_date TEXT")
 
             conn.commit()
     except Exception as e:
-        print(f"Migration Error: {e}")
+        print(f"Migration Warning: {e}")
 
 # Run DB Init
 init_db()
 run_migrations()
 
-# --- HELPER: ZOMBIE CHECK ---
-def is_topic_active(attempt_id):
-    try:
-        with sqlite3.connect(DB_NAME) as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT 1 FROM progress WHERE id = ?", (attempt_id,))
-            return cursor.fetchone() is not None
-    except:
-        return False
+# =========================================================
+# 📂 STATIC FILE SERVING (IMAGES)
+# =========================================================
+@app.route('/static/images/<path:filename>')
+def serve_image(filename):
+    return send_from_directory('static/images', filename)
 
-# --- PRE-FETCHING TASKS ---
-
-def prefetch_lesson_task(attempt_id, node_index, topic_name, node_title):
-    if not is_topic_active(attempt_id): return
-
-    try:
-        with sqlite3.connect(DB_NAME) as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT 1 FROM module_lessons WHERE attempt_id = ? AND node_title = ?", (attempt_id, node_title))
-            if cursor.fetchone(): return 
-
-        print(f"🔮 [Pre-fetch] Pre-writing Lesson: {node_title}")
-        time.sleep(node_index * 1.5) 
-
-        result = generate_node_content(topic_name, node_title)
-        
-        if not is_topic_active(attempt_id): return 
-
-        if result and result.get('content'):
-            with sqlite3.connect(DB_NAME) as conn:
-                cursor = conn.cursor()
-                cursor.execute("INSERT INTO module_lessons (attempt_id, node_index, node_title, content, image_url, quiz_data) VALUES (?, ?, ?, ?, ?, ?)", 
-                               (attempt_id, node_index, node_title, result['content'], result.get('image_url'), json.dumps(result['quiz'])))
-                conn.commit()
-            print(f"✅ [Pre-fetch] Saved Lesson: {node_title}")
-    except Exception as e:
-        print(f"⚠️ Pre-fetch Lesson Failed: {e}")
-
-def prefetch_sub_roadmap_task(attempt_id, module_index, topic_name, module_title):
-    if not is_topic_active(attempt_id): return 
-
-    try:
-        with sqlite3.connect(DB_NAME) as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT 1 FROM sub_roadmaps WHERE attempt_id = ? AND module_index = ?", (attempt_id, module_index))
-            if cursor.fetchone(): return 
-
-        print(f"🔮 [Pre-fetch] Predicting Next Module: {module_title}")
-        time.sleep(1) 
-        
-        result = generate_sub_roadmap(topic_name, module_title)
-        
-        if not is_topic_active(attempt_id): return
-
-        if result and result.get('sub_roadmap'):
-            with sqlite3.connect(DB_NAME) as conn:
-                cursor = conn.cursor()
-                cursor.execute("INSERT INTO sub_roadmaps (attempt_id, module_index, sub_roadmap_data) VALUES (?, ?, ?)", 
-                               (attempt_id, module_index, json.dumps(result['sub_roadmap'])))
-                conn.commit()
-            print(f"✅ [Pre-fetch] Saved Module Structure: {module_title}")
-
-            sub_map = result['sub_roadmap']
-            for i, node in enumerate(sub_map[:3]): 
-                executor.submit(prefetch_lesson_task, attempt_id, i, topic_name, node['title'])
-
-    except Exception as e:
-        print(f"⚠️ Pre-fetch Sub-Map Failed: {e}")
-
-# --- AUTH ROUTES ---
+# =========================================================
+# 🔐 AUTHENTICATION
+# =========================================================
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
@@ -238,270 +181,123 @@ def login():
     with sqlite3.connect(DB_NAME) as conn:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        cursor.execute("SELECT id, name, xp, level FROM users WHERE email = ? AND password = ?", (email, hashed_pw))
+        cursor.execute("SELECT id, name, xp, level FROM users WHERE email = ? AND password = ?", (email, hashed_pw, name))
         user = cursor.fetchone()
         if user:
             return jsonify({"message": "Login successful", "user": {"id": user['id'], "name": user['name'], "xp": user['xp'], "level": user['level']}}), 200
         else: return jsonify({"error": "Invalid credentials"}), 401
 
-@app.route('/api/get_user_history', methods=['POST'])
-def get_user_history():
-    data = request.json
-    user_id = data.get('user_id')
-    if not user_id: return jsonify({"history": []})
-    history = []
-    try:
-        with sqlite3.connect(DB_NAME) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            cursor.execute("SELECT id, topic_name FROM progress WHERE user_id = ? ORDER BY id DESC LIMIT 10", (user_id,))
-            rows = cursor.fetchall()
-            for row in rows: history.append({ "id": row['id'], "topic": row['topic_name'] })
-    except: pass
-    return jsonify({"history": history})
-@app.route('/static/images/<path:filename>')
-def serve_image(filename):
-    return send_from_directory('static/images', filename)
+# =========================================================
+# 🧠 AI & ROADMAP GENERATION
+# =========================================================
 
-# ✅ NEW: Alias to stop 404 errors in logs
-@app.route('/api/my_topics', methods=['GET'])
-def my_topics_alias():
+# Helper: Check if topic still exists (Zombie Check)
+def is_topic_active(attempt_id):
     try:
-        # Some frontend versions send GET with query param
-        user_id = request.args.get('user_id') 
-        # Or if it sends a token, we handle robustly. For now, fetch generic recent or specific user if ID passed.
-        if not user_id: return jsonify({"history": []})
-        
-        history = []
         with sqlite3.connect(DB_NAME) as conn:
-            conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            cursor.execute("SELECT id, topic_name FROM progress WHERE user_id = ? ORDER BY id DESC LIMIT 10", (user_id,))
-            rows = cursor.fetchall()
-            for row in rows: history.append({ "id": row['id'], "topic": row['topic_name'] })
-        return jsonify({"history": history})
+            cursor.execute("SELECT 1 FROM progress WHERE id = ?", (attempt_id,))
+            return cursor.fetchone() is not None
     except:
-        return jsonify({"history": []})
+        return False
 
-@app.route('/api/get_user_stats', methods=['POST'])
-def get_user_stats():
-    data = request.json
-    user_id = data.get('user_id')
-    stats = { "topics_started": 0, "modules_completed": 0, "total_xp": 0, "level": 1 }
-    if not user_id: return jsonify(stats)
+# Background Task: Pre-fetch Sub-Roadmap
+def prefetch_sub_roadmap_task(attempt_id, module_index, topic_name, module_title):
+    if not is_topic_active(attempt_id): return 
     try:
         with sqlite3.connect(DB_NAME) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT xp, level FROM users WHERE id = ?", (user_id,))
-            user_row = cursor.fetchone()
-            if user_row:
-                stats['total_xp'] = user_row[0]
-                stats['level'] = user_row[1]
-            cursor.execute("SELECT completed_modules FROM progress WHERE user_id = ?", (user_id,))
-            rows = cursor.fetchall()
-            stats['topics_started'] = len(rows)
-            for row in rows:
-                try:
-                    modules_list = json.loads(row[0])
-                    stats['modules_completed'] += len(modules_list)
-                except: pass
-    except: pass
-    return jsonify(stats)
+            cursor.execute("SELECT 1 FROM sub_roadmaps WHERE attempt_id = ? AND module_index = ?", (attempt_id, module_index))
+            if cursor.fetchone(): return 
 
-@app.route('/api/update_profile', methods=['POST'])
-def update_profile():
-    data = request.json
-    user_id = data.get('user_id')
-    new_name = data.get('name')
-    try:
-        with sqlite3.connect(DB_NAME) as conn:
-            cursor = conn.cursor()
-            cursor.execute("UPDATE users SET name = ? WHERE id = ?", (new_name, user_id))
-            conn.commit()
-            return jsonify({"success": True})
-    except Exception as e: return jsonify({"error": str(e)}), 500
-
-@app.route('/api/delete_topic', methods=['POST'])
-def delete_topic():
-    data = request.json
-    attempt_id = data.get('attempt_id')
-    if not attempt_id: return jsonify({"error": "ID required"}), 400
-    try:
-        with sqlite3.connect(DB_NAME) as conn:
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM chat_messages WHERE attempt_id = ?", (attempt_id,))
-            cursor.execute("DELETE FROM module_lessons WHERE attempt_id = ?", (attempt_id,))
-            cursor.execute("DELETE FROM sub_roadmaps WHERE attempt_id = ?", (attempt_id,))
-            cursor.execute("DELETE FROM progress WHERE id = ?", (attempt_id,))
-            conn.commit()
-            print(f"🗑️ Topic {attempt_id} deleted.")
-            return jsonify({"success": True})
-    except Exception as e: return jsonify({"error": str(e)}), 500
-
-# --- CHAT ROUTES ---
-
-@app.route('/api/get_node_chat', methods=['POST'])
-def get_node_chat():
-    data = request.json
-    attempt_id = data.get('attempt_id')
-    node_title = data.get('node_title')
-    messages = []
-    try:
-        with sqlite3.connect(DB_NAME) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            cursor.execute("SELECT id, sender, message FROM chat_messages WHERE attempt_id = ? AND node_title = ? ORDER BY id ASC", (attempt_id, node_title))
-            rows = cursor.fetchall()
-            for row in rows: messages.append({ "id": row['id'], "sender": row['sender'], "text": row['message'] })
-    except: pass
-    return jsonify({"messages": messages})
-
-@app.route('/api/send_chat_message', methods=['POST'])
-def send_chat_message():
-    data = request.json
-    attempt_id = data.get('attempt_id')
-    node_title = data.get('node_title')
-    user_message = data.get('message')
-    if not user_message: return jsonify({"error": "Empty message"}), 400
-
-    user_msg_id, ai_msg_id = None, None
-    try:
-        with sqlite3.connect(DB_NAME) as conn:
-            cursor = conn.cursor()
-            cursor.execute("INSERT INTO chat_messages (attempt_id, node_title, sender, message) VALUES (?, ?, ?, ?)", (attempt_id, node_title, 'user', user_message))
-            user_msg_id = cursor.lastrowid
-            conn.commit()
-    except Exception as e: return jsonify({"error": str(e)}), 500
-
-    ai_response_text = generate_doubt_answer(node_title, node_title, user_message) 
-
-    try:
-        with sqlite3.connect(DB_NAME) as conn:
-            cursor = conn.cursor()
-            cursor.execute("INSERT INTO chat_messages (attempt_id, node_title, sender, message) VALUES (?, ?, ?, ?)", (attempt_id, node_title, 'ai', ai_response_text))
-            ai_msg_id = cursor.lastrowid
-            conn.commit()
-    except: pass
-
-    return jsonify({
-        "user_message": {"id": user_msg_id, "sender": "user", "text": user_message},
-        "ai_message": {"id": ai_msg_id, "sender": "ai", "text": ai_response_text}
-    })
-
-# --- CORE LOGIC ---
-
-# ✅ THIS WAS MISSING. RESTORED IT.
-# Inside app.py
-
-@app.route('/api/generate_roadmap', methods=['POST'])
-def handle_generate_roadmap():
-    data = request.json
-    user_id = data.get('user_id')
-    topic = data.get('topic')
-    
-    print(f"🧠 Generating roadmap for: {topic}")
-
-    try:
-        # 1. Generate Intro & Roadmap
-        # We fetch the intro first to get a good description
-        intro_data = generate_topic_intro(topic)
-        ai_data = generate_roadmap(topic)
+        print(f"🔮 [Pre-fetch] Predicting Next Module: {module_title}")
+        time.sleep(1) 
+        result = generate_sub_roadmap(topic_name, module_title)
         
-        roadmap_list = ai_data.get('roadmap', [])
-        clean_topic = ai_data.get('topic_name', topic)
-        
-        # ✅ FIX: Use the 'intro' from intro_data, or fallback to simple text
-        definition_data = {
-            "definition": intro_data.get('intro', f"Welcome to {clean_topic}!"),
-            "hook": intro_data.get('hook', "")
-        }
+        if not is_topic_active(attempt_id): return
 
-        # 2. Save to DB
-        with sqlite3.connect(DB_NAME) as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                INSERT INTO progress (user_id, topic_name, roadmap_data, completed_modules, definition_data)
-                VALUES (?, ?, ?, ?, ?)
-            """, (
-                user_id, 
-                clean_topic, 
-                json.dumps(roadmap_list), 
-                '[]', 
-                json.dumps(definition_data) # Save the full object
-            ))
+        if result and result.get('sub_roadmap'):
+            with sqlite3.connect(DB_NAME) as conn:
+                cursor = conn.cursor()
+                cursor.execute("INSERT INTO sub_roadmaps (attempt_id, module_index, sub_roadmap_data) VALUES (?, ?, ?)", 
+                               (attempt_id, module_index, json.dumps(result['sub_roadmap'])))
+                conn.commit()
+            print(f"✅ [Pre-fetch] Saved Module Structure: {module_title}")
             
-            attempt_id = cursor.lastrowid
-            conn.commit()
-            
-        # 3. Trigger background tasks
-        if len(roadmap_list) > 0:
-             first_module = roadmap_list[0]['title']
-             executor.submit(prefetch_sub_roadmap_task, attempt_id, 0, clean_topic, first_module)
-
-        return jsonify({
-            "success": True, 
-            "attempt_id": attempt_id,
-            "topic": clean_topic,
-            "definition": definition_data # Return immediate data to frontend
-        })
+            # Helper to prefetch first few lessons of sub-roadmap
+            for i, node in enumerate(result['sub_roadmap'][:3]):
+                executor.submit(prefetch_lesson_task, attempt_id, i, topic_name, node['title'])
 
     except Exception as e:
-        print(f"❌ Error generating roadmap: {e}")
-        return jsonify({"error": str(e)}), 500
+        print(f"⚠️ Pre-fetch Sub-Map Failed: {e}")
 
+# 1. CREATE NEW TOPIC (Generates Full Roadmap)
+@app.route('/api/generate_roadmap', methods=['POST'])
+def generate_roadmap_api():
+    data = request.json
+    topic = data.get('topic')
+    user_id = data.get('user_id')
+
+    print(f"🧠 Generating roadmap for: {topic}")
+
+    # A. Generate AI Content
+    intro_data = generate_topic_intro(topic) # { "intro": "...", "hook": "..." }
+    roadmap_data = generate_roadmap(topic)   # { "roadmap": [...] }
+    
+    clean_topic = roadmap_data.get('topic_name', topic)
+    roadmap_list = roadmap_data.get('roadmap', [])
+
+    # B. Save to Database
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO progress (user_id, topic_name, roadmap_data, definition_data, completed_modules)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (
+            user_id, 
+            clean_topic, 
+            json.dumps(roadmap_list), 
+            json.dumps(intro_data),
+            '[]'
+        ))
+        attempt_id = cursor.lastrowid
+
+    # C. Trigger Background Pre-fetch
+    if len(roadmap_list) > 0:
+        executor.submit(prefetch_sub_roadmap_task, attempt_id, 0, clean_topic, roadmap_list[0]['title'])
+
+    return jsonify({
+        "success": True,
+        "attempt_id": attempt_id,
+        "topic": clean_topic,
+        "roadmap": roadmap_list,
+        "intro": intro_data # Send back to frontend immediately
+    })
+
+# 2. GET FULL ROADMAP (Required for main_map view)
 @app.route('/api/get_roadmap', methods=['POST'])
 def get_roadmap():
     data = request.json
     attempt_id = data.get('attempt_id')
     if not attempt_id: return jsonify({"error": "No ID"}), 400
     
-    topic_name = "General Learning"
-    completed_modules = []
-    cached_roadmap = None
-    cached_definition = None
-
     with sqlite3.connect(DB_NAME) as conn:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         cursor.execute("SELECT topic_name, completed_modules, roadmap_data, definition_data FROM progress WHERE id = ?", (attempt_id,))
         row = cursor.fetchone()
+        
         if row:
-            topic_name = row['topic_name']
-            try: completed_modules = json.loads(row['completed_modules'])
-            except: completed_modules = []
-            if row['roadmap_data']:
-                try: cached_roadmap = json.loads(row['roadmap_data'])
-                except: pass
-            if row['definition_data']:
-                try: cached_definition = json.loads(row['definition_data'])
-                except: pass
+            return jsonify({
+                "topic": row['topic_name'],
+                "roadmap": json.loads(row['roadmap_data']),
+                "completed_indices": json.loads(row['completed_modules']) if row['completed_modules'] else [],
+                "definition": json.loads(row['definition_data']) if row['definition_data'] else None
+            })
+        else:
+            return jsonify({"error": "Topic not found"}), 404
 
-    roadmap_to_process = []
-    
-    if cached_roadmap:
-        roadmap_to_process = cached_roadmap
-    else:
-        print(f"🗺️ [Thread] Generating Roadmap for: {topic_name}")
-        new_data = generate_roadmap(topic_name)
-        if new_data and new_data.get('roadmap'):
-            roadmap_to_process = new_data['roadmap']
-            try:
-                with sqlite3.connect(DB_NAME) as conn:
-                    cursor = conn.cursor()
-                    cursor.execute("UPDATE progress SET roadmap_data = ? WHERE id = ?", (json.dumps(roadmap_to_process), attempt_id))
-                    conn.commit()
-            except: pass
-
-    if roadmap_to_process and len(roadmap_to_process) > 0:
-        first_module_title = roadmap_to_process[0]['title']
-        executor.submit(prefetch_sub_roadmap_task, attempt_id, 0, topic_name, first_module_title)
-
-    return jsonify({ 
-        "roadmap": roadmap_to_process, 
-        "completed_indices": completed_modules, 
-        "definition": cached_definition 
-    })
-
+# 3. GET SUB-ROADMAP (Required for sub_map view)
 @app.route('/api/get_sub_roadmap', methods=['POST'])
 def get_sub_roadmap():
     data = request.json
@@ -509,76 +305,71 @@ def get_sub_roadmap():
     module_index = data.get('module_index')
     module_title = data.get('module_title')
 
-    # 1. Fetch from Cache
-    cached_data = None
+    # 1. Check Cache
     with sqlite3.connect(DB_NAME) as conn:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         cursor.execute("SELECT sub_roadmap_data FROM sub_roadmaps WHERE attempt_id = ? AND module_index = ?", (attempt_id, module_index))
         row = cursor.fetchone()
         if row:
-            print(f"⚡ [Cache] Serving Sub-Roadmap for: {module_title}")
-            cached_data = json.loads(row['sub_roadmap_data'])
+            print(f"⚡ [Cache] Serving Sub-Roadmap: {module_title}")
+            return jsonify({"sub_roadmap": json.loads(row['sub_roadmap_data'])})
 
-    # 2. Get Context
-    topic_name = ""
-    next_module_title = None
+    # 2. Generate if missing
+    topic_name = "General"
     with sqlite3.connect(DB_NAME) as conn:
-        conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        cursor.execute("SELECT topic_name, roadmap_data FROM progress WHERE id = ?", (attempt_id,))
-        row = cursor.fetchone()
-        if row: 
-            topic_name = row['topic_name']
-            try:
-                full_roadmap = json.loads(row['roadmap_data'])
-                if module_index + 1 < len(full_roadmap):
-                    next_module_title = full_roadmap[module_index + 1]['title']
-            except: pass
+        cursor.execute("SELECT topic_name FROM progress WHERE id = ?", (attempt_id,))
+        res = cursor.fetchone()
+        if res: topic_name = res[0]
 
-    final_sub_map = []
-
-    if cached_data:
-        final_sub_map = cached_data
-    else:
-        print(f"🗺️ [Thread] Generating Sub-Roadmap: {module_title}")
-        result = generate_sub_roadmap(topic_name, module_title)
+    print(f"🗺️ Generating Sub-Roadmap: {module_title}")
+    result = generate_sub_roadmap(topic_name, module_title)
+    
+    if result and result.get('sub_roadmap'):
+        final_sub_map = result['sub_roadmap']
+        # Save to DB
+        with sqlite3.connect(DB_NAME) as conn:
+            cursor = conn.cursor()
+            cursor.execute("INSERT INTO sub_roadmaps (attempt_id, module_index, sub_roadmap_data) VALUES (?, ?, ?)", 
+                          (attempt_id, module_index, json.dumps(final_sub_map)))
+            conn.commit()
+            
+        # Trigger Lesson Prefetch for first 3 items
+        for i, node in enumerate(final_sub_map[:3]): 
+            executor.submit(prefetch_lesson_task, attempt_id, i, topic_name, node['title'])
+            
+        return jsonify({"sub_roadmap": final_sub_map})
         
-        if not is_topic_active(attempt_id): return jsonify({})
+    return jsonify({"sub_roadmap": []})
 
-        if result and result.get('sub_roadmap'):
-            final_sub_map = result['sub_roadmap']
-            try:
-                with sqlite3.connect(DB_NAME) as conn:
-                    cursor = conn.cursor()
-                    cursor.execute("INSERT INTO sub_roadmaps (attempt_id, module_index, sub_roadmap_data) VALUES (?, ?, ?)", (attempt_id, module_index, json.dumps(final_sub_map)))
-                    conn.commit()
-            except: pass
+# =========================================================
+# 📚 LESSON & CONTENT MANAGEMENT
+# =========================================================
 
-    completed_indices = []
-    if final_sub_map:
-        try:
+# Helper: Background Lesson Generation
+def prefetch_lesson_task(attempt_id, node_index, topic_name, node_title):
+    if not is_topic_active(attempt_id): return
+    try:
+        with sqlite3.connect(DB_NAME) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT 1 FROM module_lessons WHERE attempt_id = ? AND node_title = ?", (attempt_id, node_title))
+            if cursor.fetchone(): return 
+
+        print(f"🔮 [Pre-fetch] Writing Lesson: {node_title}")
+        result = generate_node_content(topic_name, node_title)
+        
+        if not is_topic_active(attempt_id): return 
+
+        if result and result.get('content'):
             with sqlite3.connect(DB_NAME) as conn:
                 cursor = conn.cursor()
-                cursor.execute("SELECT node_title FROM module_lessons WHERE attempt_id = ? AND completed = 1", (attempt_id,))
-                completed_titles = {row[0] for row in cursor.fetchall()}
-                
-                for idx, node in enumerate(final_sub_map):
-                    if node['title'] in completed_titles:
-                        completed_indices.append(idx)
-        except Exception as e: print(f"Error checking completion: {e}")
-
-    if final_sub_map and len(final_sub_map) > 0:
-        for i, node in enumerate(final_sub_map):
-            executor.submit(prefetch_lesson_task, attempt_id, i, topic_name, node['title'])
-    
-    if next_module_title:
-        executor.submit(prefetch_sub_roadmap_task, attempt_id, module_index + 1, topic_name, next_module_title)
-
-    return jsonify({
-        "sub_roadmap": final_sub_map,
-        "completed_indices": completed_indices 
-    })
+                cursor.execute("INSERT INTO module_lessons (attempt_id, node_index, node_title, content, image_url, quiz_data) VALUES (?, ?, ?, ?, ?, ?)", 
+                               (attempt_id, node_index, node_title, result['content'], result.get('image_url'), json.dumps(result['quiz'])))
+                conn.commit()
+            print(f"✅ [Pre-fetch] Saved Lesson: {node_title}")
+    except Exception as e:
+        print(f"⚠️ Pre-fetch Lesson Failed: {e}")
 
 @app.route('/api/get_node', methods=['POST'])
 def get_node():
@@ -594,35 +385,36 @@ def get_node():
         cursor.execute("SELECT content, image_url, quiz_data FROM module_lessons WHERE attempt_id = ? AND node_title = ?", (attempt_id, node_title))
         row = cursor.fetchone()
         if row:
-            print(f"⚡ [Cache] Serving Lesson for: {node_title}")
-            return jsonify({ "content": row['content'], "image_url": row['image_url'], "quiz": json.loads(row['quiz_data']) if row['quiz_data'] else [] })
+            return jsonify({ 
+                "content": row['content'], 
+                "image_url": row['image_url'], 
+                "quiz": json.loads(row['quiz_data']) if row['quiz_data'] else [] 
+            })
 
+    # 2. Generate Content
     topic_name = "General"
-    if attempt_id:
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT topic_name FROM progress WHERE id = ?", (attempt_id,))
+        res = cursor.fetchone()
+        if res: topic_name = res[0]
+
+    print(f"📚 Generating Content: {node_title}")
+    result = generate_node_content(topic_name, node_title)
+    
+    # Save to DB
+    if result and result.get('content'):
         with sqlite3.connect(DB_NAME) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT topic_name FROM progress WHERE id = ?", (attempt_id,))
-            row = cursor.fetchone()
-            if row: topic_name = row[0]
+            cursor.execute("INSERT INTO module_lessons (attempt_id, node_index, node_title, content, image_url, quiz_data) VALUES (?, ?, ?, ?, ?, ?)", 
+                           (attempt_id, node_index, node_title, result['content'], result.get('image_url'), json.dumps(result['quiz'])))
+            conn.commit()
+            
+    return jsonify(result)
 
-    def content_task():
-        if not is_topic_active(attempt_id): return {}
-        print(f"📚 [Thread] Generating Content: {node_title}")
-        result = generate_node_content(topic_name, node_title)
-        
-        if not is_topic_active(attempt_id): return result
-
-        try:
-            with sqlite3.connect(DB_NAME) as conn:
-                cursor = conn.cursor()
-                cursor.execute("INSERT INTO module_lessons (attempt_id, node_index, node_title, content, image_url, quiz_data) VALUES (?, ?, ?, ?, ?, ?)", 
-                               (attempt_id, node_index, node_title, result['content'], result.get('image_url'), json.dumps(result['quiz'])))
-                conn.commit()
-        except: pass
-        return result
-
-    future = executor.submit(content_task)
-    return jsonify(future.result())
+# =========================================================
+# 🎓 QUIZ & PROGRESS TRACKING
+# =========================================================
 
 @app.route('/api/submit_node_quiz', methods=['POST'])
 def submit_node_quiz():
@@ -638,9 +430,15 @@ def submit_node_quiz():
         try:
             with sqlite3.connect(DB_NAME) as conn:
                 cursor = conn.cursor()
+                
+                # Mark lesson complete
                 cursor.execute("UPDATE module_lessons SET completed = 1 WHERE attempt_id = ? AND node_title = ?", (attempt_id, node_title))
+                
+                # Add XP
                 xp_gained = 50
                 cursor.execute("UPDATE users SET xp = xp + ? WHERE id = (SELECT user_id FROM progress WHERE id=?)", (xp_gained, attempt_id))
+                
+                # Check Level Up
                 cursor.execute("SELECT xp, level FROM users WHERE id = (SELECT user_id FROM progress WHERE id=?)", (attempt_id,))
                 user_row = cursor.fetchone()
                 if user_row:
@@ -674,19 +472,83 @@ def mark_module_complete():
             return jsonify({"success": True, "completed_modules": completed_list})
     except Exception as e: return jsonify({"error": str(e)}), 500
 
-@app.route('/api/get_notes', methods=['POST'])
-def get_notes():
+@app.route('/api/regenerate_remedial', methods=['POST'])
+def regenerate_remedial():
     data = request.json
     attempt_id = data.get('attempt_id')
     node_title = data.get('node_title')
+    failed_questions = data.get('failed_questions')
+    
+    topic_name = "General"
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT topic_name FROM progress WHERE id = ?", (attempt_id,))
+        res = cursor.fetchone()
+        if res: topic_name = res[0]
+
+    result = generate_remedial_content(topic_name, node_title, str(failed_questions))
+    
+    if result and result.get('content'):
+        with sqlite3.connect(DB_NAME) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE module_lessons 
+                SET content = ?, quiz_data = ? 
+                WHERE attempt_id = ? AND node_title = ?
+            """, (result['content'], json.dumps(result['quiz']), attempt_id, node_title))
+            conn.commit()
+        return jsonify({"success": True, "new_content": result})
+            
+    return jsonify({"error": "Failed to generate"}), 500
+
+# =========================================================
+# 💬 CHAT & NOTES
+# =========================================================
+
+@app.route('/api/get_node_chat', methods=['POST'])
+def get_node_chat():
+    data = request.json
+    attempt_id = data.get('attempt_id')
+    node_title = data.get('node_title')
+    messages = []
     try:
         with sqlite3.connect(DB_NAME) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            cursor.execute("SELECT content FROM user_notes WHERE attempt_id = ? AND node_title = ?", (attempt_id, node_title))
-            row = cursor.fetchone()
-            return jsonify({"content": row['content'] if row else ""})
-    except Exception as e: return jsonify({"error": str(e)}), 500
+            cursor.execute("SELECT id, sender, message FROM chat_messages WHERE attempt_id = ? AND node_title = ? ORDER BY id ASC", (attempt_id, node_title))
+            rows = cursor.fetchall()
+            for row in rows: messages.append({ "id": row['id'], "sender": row['sender'], "text": row['message'] })
+    except: pass
+    return jsonify({"messages": messages})
+
+@app.route('/api/send_chat_message', methods=['POST'])
+def send_chat_message():
+    data = request.json
+    attempt_id = data.get('attempt_id')
+    node_title = data.get('node_title')
+    user_message = data.get('message')
+    
+    # Save User Msg
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO chat_messages (attempt_id, node_title, sender, message) VALUES (?, ?, ?, ?)", (attempt_id, node_title, 'user', user_message))
+        user_msg_id = cursor.lastrowid
+        conn.commit()
+
+    # Get AI Response
+    ai_response_text = generate_doubt_answer(node_title, node_title, user_message) 
+
+    # Save AI Msg
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO chat_messages (attempt_id, node_title, sender, message) VALUES (?, ?, ?, ?)", (attempt_id, node_title, 'ai', ai_response_text))
+        ai_msg_id = cursor.lastrowid
+        conn.commit()
+
+    return jsonify({
+        "user_message": {"id": user_msg_id, "sender": "user", "text": user_message},
+        "ai_message": {"id": ai_msg_id, "sender": "ai", "text": ai_response_text}
+    })
 
 @app.route('/api/save_notes', methods=['POST'])
 def save_notes():
@@ -707,97 +569,55 @@ def save_notes():
             return jsonify({"success": True})
     except Exception as e: return jsonify({"error": str(e)}), 500
 
-@app.route('/api/regenerate_remedial', methods=['POST'])
-def regenerate_remedial():
+@app.route('/api/get_notes', methods=['POST'])
+def get_notes():
     data = request.json
     attempt_id = data.get('attempt_id')
     node_title = data.get('node_title')
-    failed_questions = data.get('failed_questions')
-    
-    topic_name = "General"
-    with sqlite3.connect(DB_NAME) as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT topic_name FROM progress WHERE id = ?", (attempt_id,))
-        row = cursor.fetchone()
-        if row: topic_name = row[0]
-
-    result = generate_remedial_content(topic_name, node_title, str(failed_questions))
-    
-    if result and result.get('content'):
-        try:
-            with sqlite3.connect(DB_NAME) as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    UPDATE module_lessons 
-                    SET content = ?, quiz_data = ? 
-                    WHERE attempt_id = ? AND node_title = ?
-                """, (result['content'], json.dumps(result['quiz']), attempt_id, node_title))
-                conn.commit()
-            return jsonify({"success": True, "new_content": result})
-        except Exception as e:
-            return jsonify({"error": str(e)}), 500
-            
-    return jsonify({"error": "Failed to generate"}), 500
-
-@app.route('/api/get_notifications', methods=['POST'])
-def get_notifications():
-    data = request.json
-    user_id = data.get('user_id')
-    
-    notifications = []
-    
     try:
         with sqlite3.connect(DB_NAME) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            cursor.execute("SELECT xp, streak, last_active_date FROM users WHERE id = ?", (user_id,))
-            user = cursor.fetchone()
-            
-            risk_high = False 
-            if user and user['xp'] < 100: risk_high = True
+            cursor.execute("SELECT content FROM user_notes WHERE attempt_id = ? AND node_title = ?", (attempt_id, node_title))
+            row = cursor.fetchone()
+            return jsonify({"content": row['content'] if row else ""})
+    except: return jsonify({"content": ""})
 
-            notifications.append({
-                "id": 1,
-                "type": "info",
-                "title": "Welcome to LearnAI!",
-                "message": "Start your first module to earn XP.",
-                "time": "Just now"
-            })
+# =========================================================
+# 👤 USER PROFILE & DASHBOARD
+# =========================================================
 
-            if user and user['streak'] > 0:
-                notifications.append({
-                    "id": 2,
-                    "type": "success",
-                    "title": "🔥 Streak Active!",
-                    "message": f"You are on a {user['streak']} day streak. Keep it up!",
-                    "time": "Today"
-                })
+@app.route('/api/get_user_history', methods=['POST'])
+def get_user_history():
+    data = request.json
+    user_id = data.get('user_id')
+    history = []
+    try:
+        with sqlite3.connect(DB_NAME) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, topic_name FROM progress WHERE user_id = ? ORDER BY id DESC LIMIT 10", (user_id,))
+            rows = cursor.fetchall()
+            for row in rows: history.append({ "id": row['id'], "topic": row['topic_name'] })
+    except: pass
+    return jsonify({"history": history})
 
-            if risk_high:
-                 notifications.append({
-                    "id": 3,
-                    "type": "warning",
-                    "title": "⚠️ Risk Alert",
-                    "message": "Our AI noticed you are struggling. Check your Health Monitor.",
-                    "time": "2 hours ago"
-                })
-
-            if user and user['last_active_date']:
-                last_date = datetime.strptime(user['last_active_date'], "%Y-%m-%d").date()
-                days_gap = (datetime.now().date() - last_date).days
-                if days_gap > 2:
-                    notifications.append({
-                        "id": 4,
-                        "type": "mail",
-                        "title": "💌 We missed you...",
-                        "message": f"You haven't learned in {days_gap} days. Come back and earn 50 XP!",
-                        "time": f"{days_gap} days ago"
-                    })
-
-    except Exception as e:
-        print(e)
-        
-    return jsonify({"notifications": notifications})
+@app.route('/api/delete_topic', methods=['POST'])
+def delete_topic():
+    data = request.json
+    attempt_id = data.get('attempt_id')
+    try:
+        with sqlite3.connect(DB_NAME) as conn:
+            cursor = conn.cursor()
+            # Cascade delete (manual since SQLite FK cascade might be off)
+            cursor.execute("DELETE FROM chat_messages WHERE attempt_id = ?", (attempt_id,))
+            cursor.execute("DELETE FROM module_lessons WHERE attempt_id = ?", (attempt_id,))
+            cursor.execute("DELETE FROM sub_roadmaps WHERE attempt_id = ?", (attempt_id,))
+            cursor.execute("DELETE FROM user_notes WHERE attempt_id = ?", (attempt_id,))
+            cursor.execute("DELETE FROM progress WHERE id = ?", (attempt_id,))
+            conn.commit()
+            return jsonify({"success": True})
+    except Exception as e: return jsonify({"error": str(e)}), 500
 
 @app.route('/api/update_streak', methods=['POST'])
 def update_streak():
@@ -847,12 +667,9 @@ def update_streak():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# --- ML ROUTES ---
-
-@app.route('/api/train_dropout_model', methods=['POST'])
-def run_ml_training():
-    result = train_model()
-    return jsonify(result)
+# =========================================================
+# 🤖 ML & NOTIFICATIONS
+# =========================================================
 
 @app.route('/api/predict_dropout_risk', methods=['POST'])
 def get_dropout_risk():
@@ -863,6 +680,50 @@ def get_dropout_risk():
         return jsonify(result)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.route('/api/get_notifications', methods=['POST'])
+def get_notifications():
+    data = request.json
+    user_id = data.get('user_id')
+    notifications = []
+    
+    try:
+        with sqlite3.connect(DB_NAME) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("SELECT xp, streak, last_active_date FROM users WHERE id = ?", (user_id,))
+            user = cursor.fetchone()
+            
+            if not user: return jsonify({"notifications": []})
+
+            # 1. Welcome Msg
+            notifications.append({
+                "id": 1, "type": "info", "title": "Welcome!", "message": "Start learning to earn XP.", "time": "Just now"
+            })
+
+            # 2. Streak Msg
+            if user['streak'] > 0:
+                notifications.append({
+                    "id": 2, "type": "success", "title": "🔥 Streak Active!", "message": f"{user['streak']} day streak.", "time": "Today"
+                })
+
+            # 3. Risk Msg
+            if user['xp'] < 50 and user['streak'] == 0:
+                 notifications.append({
+                    "id": 3, "type": "warning", "title": "⚠️ Risk Alert", "message": "You are falling behind.", "time": "2h ago"
+                })
+
+            # 4. Inactivity Msg
+            if user['last_active_date']:
+                last_date = datetime.strptime(user['last_active_date'], "%Y-%m-%d").date()
+                days_gap = (datetime.now().date() - last_date).days
+                if days_gap > 2:
+                    notifications.append({
+                        "id": 4, "type": "mail", "title": "💌 We missed you...", "message": f"Gone for {days_gap} days.", "time": f"{days_gap}d ago"
+                    })
+
+    except Exception as e: print(e)
+    return jsonify({"notifications": notifications})
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000, threaded=True)

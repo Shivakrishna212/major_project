@@ -1906,3 +1906,61 @@ body {
 .markdown-content li {
   margin-bottom: 5px;
 }
+
+/* --- NOTIFICATION DROPDOWN (Portal Style) --- */
+.notification-dropdown {
+  /* Positioning is handled in JS now, but just in case: */
+  position: fixed; 
+  z-index: 99999;
+  
+  /* Visual Style */
+  width: 300px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 5px 30px rgba(0,0,0,0.2);
+  border: 1px solid #e0e0e0;
+  overflow: hidden;
+  animation: popIn 0.2s ease-out;
+}
+
+@keyframes popIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.notification-item {
+  padding: 15px;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 0.9rem;
+  color: #333;
+  cursor: pointer;
+  background: white;
+}
+
+.notification-item:hover {
+  background-color: #f8f9fa;
+}
+/* =========================================
+   10. INVISIBLE SCROLLBARS
+   ========================================= */
+
+/* Target all scrollable containers in the app */
+.sidebar-nav, 
+.lesson-panel, 
+.chat-messages, 
+.main-content,
+.notification-dropdown > div, /* The inner list inside notifications */
+body {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+}
+
+/* Chrome, Safari, and Opera */
+.sidebar-nav::-webkit-scrollbar, 
+.lesson-panel::-webkit-scrollbar, 
+.chat-messages::-webkit-scrollbar, 
+.main-content::-webkit-scrollbar,
+.notification-dropdown > div::-webkit-scrollbar,
+body::-webkit-scrollbar {
+    display: none;
+}
